@@ -14,8 +14,12 @@ async def main():
     return all_players_stats
   
 def clean(text):
-    clean_text = re.sub(r'[\W]', '', text)
-    return clean_text
+    text = re.sub(r' ', '_zzzzzspacezzzzz_', text)
+    text = re.sub(r'-', '_zzzzzdashzzzzz_', text)
+    text = re.sub(r'[\W]', '', text)
+    text = re.sub(r'_zzzzzspacezzzzz_', ' ', text)
+    text = re.sub(r'_zzzzzdashzzzzz_', '-', text)
+    return text
 
 def create_table(sql_connection,table_name,position,order_by,direction):
   sql_cursor = sql_connection.cursor()
@@ -25,6 +29,75 @@ def create_table(sql_connection,table_name,position,order_by,direction):
   # sorted_player_stats = sql_cursor.execute(f"SELECT player_name,player_position,player_score FROM {clean(table_name)}")
   # for i in range(0,length):
   #   print(sorted_player_stats.fetchone())
+
+def create_team(sql_connection):
+  formation_complete = False
+  while formation_complete == False:
+    formation_complete = True
+    formation = input('What formation do you want to choose:\n 4-3-3 (Enter 1)\n 4-4-2 (Enter 2)\n 5-4-1 (Enter 3) ').lower()
+    if formation == '1':
+      number_of_defenders = 4
+      number_of_midfielders = 3
+      number_of_forwards = 3
+    elif formation == '2':
+      number_of_defenders = 4
+      number_of_midfielders = 4
+      number_of_forwards = 2
+    elif formation == '3':
+      number_of_defenders = 5
+      number_of_midfielders = 4
+      number_of_forwards = 1
+    else:
+      formation_complete = False
+      print('Pick a number from 1 to 3 corresponding to the formation you want to select.')
+
+    add_player(sql_connection,'goalkeeper')
+    for i in range(0,number_of_defenders):
+      add_player(sql_connection,'defence')
+    for i in range(0,number_of_midfielders):
+      add_player(sql_connection,'midfield')
+    for i in range(0,number_of_forwards):
+      add_player(sql_connection,'forward')
+    sql_connection.commit()
+
+def add_player(sql_connection,table_name):
+  sql_cursor = sql_connection.cursor()
+  pick_complete = False
+  while pick_complete == False:
+    player_chosen = input(f'Choose your {table_name}: ')
+    name_list = sql_cursor.execute(f'SELECT player_name FROM {clean(table_name)} WHERE player_name LIKE "%{clean(player_chosen)}%"').fetchall()
+    if len(name_list) == 0:
+      print('There is no player in this postition with this name. Make sure the name of the player you want is spelt correctly.')
+    elif len(name_list) > 1:
+      print('There are multiple players with a similar names.')
+      for i in range(0,len(name_list)):
+        print(f'Enter {i+1} for {name_list[i][0]}.')
+      print('Enter (0) to select another player.')
+      player_number = -1
+      while player_number > len(name_list) or player_number < 0:
+        try:
+          player_number = int(input('Please select the number corresponding to the player you want: '))
+        except ValueError:
+          pass
+      if player_number == 0:
+        pass
+      else:
+        player_chosen = name_list[player_number-1][0]
+        pick_complete = True
+    elif len(name_list) == 1:
+      player_chosen = name_list[0][0]
+      pick_complete = True
+    else:
+      print('Unexpected error.')
+    if pick_complete == True:
+      player_check = sql_cursor.execute(f'SELECT COUNT(*) FROM team WHERE player_name LIKE "{clean(player_chosen)}"')
+      player_check = player_check.fetchall()[0][0]
+      if player_check != 0:
+        pick_complete = False
+        print(f'{clean(player_chosen)} is already in your team. Please choose another player.')
+      else:
+        print(f'{clean(player_chosen)} SELECTED')
+        sql_cursor.execute(f'INSERT INTO team SELECT * FROM {clean(table_name)} WHERE player_name LIKE "{clean(player_chosen)}"')
 
 loop = asyncio.get_event_loop()
 all_players_stats = loop.run_until_complete(main())
@@ -72,10 +145,10 @@ sql_cursor.execute("UPDATE player_stats SET player_score = goals*7 + assists*10 
 sql_cursor.execute("UPDATE player_stats SET player_score = round(player_score)")
 sql_connection.commit()
 
-# length = sql_cursor.execute(f'SELECT COUNT(*) FROM player_stats').fetchone()[0]
-# sorted_player_stats = sql_cursor.execute(f"SELECT player_name,player_position,player_score FROM player_stats ORDER BY player_score DESC")
-# for i in range(0,length):
-#   print(sorted_player_stats.fetchone())
+length = sql_cursor.execute(f'SELECT COUNT(*) FROM player_stats').fetchone()[0]
+sorted_player_stats = sql_cursor.execute(f"SELECT player_name,player_position,player_score FROM player_stats ORDER BY player_score DESC")
+for i in range(0,length):
+  print(sorted_player_stats.fetchone())
 
 create_table(sql_connection,'goalkeeper','GK','player_score','DESC')
 create_table(sql_connection,'defence','D','player_score','DESC')
@@ -109,6 +182,7 @@ while login_complete == False:
       else:
         sql_cursor.execute("INSERT INTO user_info VALUES(?,?,?)", (team_name,password,0))
         create_table(sql_connection,team_name,'T','player_score','DESC')
+        create_team(sql_connection)
         sql_connection.commit()
         print(f'You have successfuly created a new team called {team_name}')
         login_complete = True
@@ -118,77 +192,9 @@ while login_complete == False:
   elif team_name_check[0][0] != password:
     print('Make sure to enter your password correctly. Be careful of capitals.')
 
-def add_player(sql_connection,table_name):
-  sql_cursor = sql_connection.cursor()
-  pick_complete = False
-  while pick_complete == False:
-    player_chosen = input(f'Choose your {table_name}: ')
-    name_list = sql_cursor.execute(f'SELECT player_name FROM {clean(table_name)} WHERE player_name LIKE "%{clean(player_chosen)}%"').fetchall()
-    if len(name_list) == 0:
-      print('There is no player in this postition with this name. Make sure the name of the player you want is spelt correctly.')
-    elif len(name_list) > 1:
-      print('There are multiple players with a similar names.')
-      for i in range(0,len(name_list)):
-        print(f'Enter {i+1} for {name_list[i][0]}.')
-      print('Enter (0) to select another player.')
-      player_number = -1
-      while player_number > len(name_list) or player_number < 0:
-        try:
-          player_number = int(input('Please select the number corresponding to the player you want: '))
-        except ValueError:
-          pass
-      if player_number == 0:
-        pass
-      else:
-        player_chosen = name_list[player_number-1][0]
-        pick_complete = True
-    elif len(name_list) == 1:
-      player_chosen = name_list[0][0]
-      pick_complete = True
-    else:
-      print('Unexpected error.')
-    if pick_complete == True:
-      player_check = sql_cursor.execute(f'SELECT COUNT(*) FROM team WHERE player_name LIKE "{clean(player_chosen)}"')
-      player_check = player_check.fetchall()[0][0]
-      if player_check != 0:
-        pick_complete = False
-        print(f'{clean(player_chosen)} is already in your team. Please choose another player.')
-      else:
-        print(f'{clean(player_chosen)} SELECTED')
-        sql_cursor.execute(f'INSERT INTO team SELECT * FROM {clean(table_name)} WHERE player_name LIKE "{clean(player_chosen)}"')
+team = sql_cursor.execute('SELECT * FROM team')
+for i in range(0,11):
+  print(team.fetchone())
 
-# formation_complete = False
-# while formation_complete == False:
-#   formation_complete = True
-#   formation = input('What formation do you want to choose:\n 4-3-3 (Enter 1)\n 4-4-2 (Enter 2)\n 5-4-1 (Enter 3) ').lower()
-#   if formation == '1':
-#     number_of_defenders = 4
-#     number_of_midfielders = 3
-#     number_of_forwards = 3
-#   elif formation == '2':
-#     number_of_defenders = 4
-#     number_of_midfielders = 4
-#     number_of_forwards = 2
-#   elif formation == '3':
-#     number_of_defenders = 5
-#     number_of_midfielders = 4
-#     number_of_forwards = 1
-#   else:
-#     formation_complete = False
-#     print('Pick a number from 1 to 3 corresponding to the formation you want to select.')
-
-# add_player(sql_connection,'goalkeeper')
-# for i in range(0,number_of_defenders):
-#   add_player(sql_connection,'defence')
-# for i in range(0,number_of_midfielders):
-#   add_player(sql_connection,'midfield')
-# for i in range(0,number_of_forwards):
-#   add_player(sql_connection,'forward')
-# sql_connection.commit()
-
-# team = sql_cursor.execute('SELECT * FROM team')
-# for i in range(0,11):
-#   print(team.fetchone())
-
-# team_score = sql_cursor.execute('SELECT SUM(player_score) FROM team')
-# print(team_score.fetchall())
+team_score = sql_cursor.execute('SELECT SUM(player_score) FROM team')
+print(team_score.fetchall())

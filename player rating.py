@@ -9,7 +9,7 @@ async def main():
   async with aiohttp.ClientSession() as session:
     understat = Understat(session)
     all_players_stats = await understat.get_league_players(
-      "epl", 2023,
+      "epl", 2022,
     )
     return all_players_stats
 
@@ -57,27 +57,33 @@ sql_connection.commit()
 
 sql_cursor.execute("ALTER TABLE player_stats ADD player_score")
 sql_cursor.execute("UPDATE player_stats SET player_score = goals*7 + assists*10 + minutes/90 + yellow_cards*-2 + red_cards*-15 + non_penalty_goals + expected_goals_build_up*5")
-sql_cursor.execute("UPDATE player_stats SET player_score = round(player_score)")      ## FIX (ROUND)
+sql_cursor.execute("UPDATE player_stats SET player_score = round(player_score)")
 sql_connection.commit()
 
 def create_table(sql_connection,table_name,position,order_by,direction):
   sql_cursor = sql_connection.cursor()
   sql_cursor.execute(f"CREATE TABLE {table_name} AS SELECT * FROM player_stats WHERE player_position LIKE '%{position}%' ORDER BY {order_by} {direction}")
+  if position != 'M' and position != 'F' and position != 'T':
+    sql_cursor.execute(f'DELETE FROM {table_name} WHERE player_position LIKE "%M%"')
+  if position != 'F' and position != 'T':
+    sql_cursor.execute(f'DELETE FROM {table_name} WHERE player_position LIKE "%F%"')
   sql_connection.commit()
-  length = sql_cursor.execute(f'SELECT COUNT(*) FROM {table_name}').fetchone()[0]
-  sorted_player_stats = sql_cursor.execute(f"SELECT player_name,expected_goals_build_up,assists,player_position,player_score FROM {table_name}")
-  for i in range(0,length):
-    print(sorted_player_stats.fetchone())
+  # length = sql_cursor.execute(f'SELECT COUNT(*) FROM {table_name}').fetchone()[0]
+  # sorted_player_stats = sql_cursor.execute(f"SELECT player_name,player_position,player_score FROM {table_name} ORDER BY {order_by} {direction}")
+  # for i in range(0,length):
+  #   print(sorted_player_stats.fetchone())
+  test = sql_cursor.execute(f'SELECT SUM(expected_goals_build_up ) FROM {table_name}')
+  print(test.fetchall()[0][0])
 
 # length = sql_cursor.execute(f'SELECT COUNT(*) FROM player_stats').fetchone()[0]
-# sorted_player_stats = sql_cursor.execute(f"SELECT player_name,minutes,player_position,player_score FROM player_stats ORDER BY player_score DESC")
+# sorted_player_stats = sql_cursor.execute(f"SELECT player_name,player_position,player_score FROM player_stats ORDER BY player_score DESC")
 # for i in range(0,length):
 #   print(sorted_player_stats.fetchone())
 
-# create_table(sql_connection,'goalkeeper','GK','player_score','DESC')
+create_table(sql_connection,'goalkeeper','GK','player_score','DESC')
 create_table(sql_connection,'defence','D','player_score','DESC')
-# create_table(sql_connection,'midfield','M','player_score','DESC')
-# create_table(sql_connection,'forward','F','player_score','DESC')
+create_table(sql_connection,'midfield','M','player_score','DESC')
+create_table(sql_connection,'forward','F','player_score','DESC')
 
 # sql_cursor.execute("DROP TABLE IF EXISTS team")
 # create_table(sql_connection,'team','T','player_score','DESC')
