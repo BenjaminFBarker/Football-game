@@ -309,8 +309,7 @@ print(f'Your score is {team_score.fetchall()[0][0]}')
 
 week = date.today().isocalendar()[1]
 last_transfer = sql_cursor.execute('SELECT week FROM user_info WHERE team_name = ?',(team_name,)).fetchall()[0][0]
-# if week != last_transfer:
-if 1 == 1:
+if week != last_transfer:
   transfer = 'z'
   while transfer != 'y' and transfer != 'n':
     transfer = input("If you want to make a transfer (Enter Y). If you don't want to make a transfer (Enter N). ").lower()
